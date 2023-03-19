@@ -90,4 +90,16 @@ public class SegmentDefinition implements Positioned {
     public int hashCode() {
         return Objects.hash(_xid, _name, _usage, _pos, _maxUse, _syntax, _elements, _composites);
     }
+
+    @Override
+    public int compareTo(Positioned o) {
+      Objects.requireNonNull(o);
+      if (getPos().equals(o.getPos())) {
+        if (getXid().equals(o.getXid()) && o instanceof SegmentDefinition) {
+          return this.getName().compareTo(((SegmentDefinition)o).getName());
+        }
+        return getXid().compareTo(o.getXid());
+      }
+      return getPos().compareTo(o.getPos());
+    }
 }

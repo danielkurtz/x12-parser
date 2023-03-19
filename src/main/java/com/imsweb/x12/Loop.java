@@ -25,9 +25,12 @@ import com.thoughtworks.xstream.security.NoTypePermission;
 import com.thoughtworks.xstream.security.WildcardTypePermission;
 
 import com.imsweb.x12.converters.ElementConverter;
+import com.imsweb.x12.mapping.CompositeDefinition;
+import com.imsweb.x12.mapping.ElementDefinition;
 import com.imsweb.x12.mapping.LoopDefinition;
 import com.imsweb.x12.mapping.Positioned;
 import com.imsweb.x12.mapping.SegmentDefinition;
+import com.imsweb.x12.mapping.ValidCodesDefinition;
 
 /**
  * The Loop class is the representation of an Loop in a ANSI X12 transaction. The building block of an X12 transaction is an element. Some
@@ -342,6 +345,73 @@ public class Loop implements Iterable<Segment> {
     }
 
     /**
+     * Get the segments in the X12 transaction. It will check the current loop.
+     * @param segmentDefinition the SegmentDefinition of a segment
+     * @return List of Segment entities
+     */
+    public List<Segment> findSegment(SegmentDefinition segmentDefinition) {
+        return _segments.stream().filter(segment -> segmentEqualsSegmentDefinition(segment, segmentDefinition)).collect(Collectors.toList());
+    }
+
+    /**
+     * 
+     * @param segment
+     * @param segmentDefinition
+     * @return
+     */
+    private boolean segmentEqualsSegmentDefinition(Segment segment, SegmentDefinition segmentDefinition) {
+
+        if (!segment.getId().equals(segmentDefinition.getXid())) {
+            return false;
+        }
+
+        // Only the first element is relevant.
+        List<ElementDefinition> elementDefinitions = segmentDefinition.getElements();
+        if (elementDefinitions != null && elementDefinitions.size() > 0) {
+            ElementDefinition firstElementDefinition = elementDefinitions.get(0);
+            ValidCodesDefinition validCodesDefinition = firstElementDefinition.getValidCodes();
+            if (validCodesDefinition != null) {
+                List<String> validCodes =  validCodesDefinition.getCodes();
+                if (validCodes != null) {
+                    List<Element> elements = segment.getElements();
+                    if (elements != null && elements.size() > 0) {
+                        Element firstElement = elements.get(0);
+                        if (!validCodes.contains(firstElement.getValue())) {
+                            return false;
+                        }
+                    }
+                }
+            }
+        }
+
+        List<CompositeDefinition> compositeDefinitions = segmentDefinition.getComposites();
+        if (compositeDefinitions != null && compositeDefinitions.size() > 0) {
+            CompositeDefinition firstCompositeDefinition = compositeDefinitions.get(0);
+            List<ElementDefinition> compositeElementDefinitions = firstCompositeDefinition.getElements();
+            if (compositeElementDefinitions != null && compositeElementDefinitions.size() > 0) {
+                ElementDefinition firstCompositeElementDefinition = compositeElementDefinitions.get(0);
+                ValidCodesDefinition validCodesDefinition = firstCompositeElementDefinition.getValidCodes();
+                if (validCodesDefinition != null) {
+                    List<String> validCodes =  validCodesDefinition.getCodes();
+                    if (validCodes != null) {
+                        List<Element> elements = segment.getElements();
+                        if (elements != null && elements.size() > 0) {
+                            Element firstElement = elements.get(0);
+                            if (firstElement.getNumOfSubElements() > 0) {
+                                if (!validCodes.contains(firstElement.getSubElement(0))) {
+                                    return false;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        return true;
+    }
+
+    /**
      * Returns the Loop at the specified position.
      * @param index index of loop
      * @return Loop at the specified index. Returns null if the index is greater than or equal to the size of the loop list.
@@ -387,6 +457,32 @@ public class Loop implements Iterable<Segment> {
         List<Segment> segs = findSegment(id);
         if (index < segs.size())
             return findSegment(id).get(index);
+        return null;
+    }
+
+        /**
+     * Finds the segment with the first occurrence that matches the SegmentDefinition and returns it
+     * @param segmentDefinition of the segment to find.
+     * @return the first occurrence that matches the SegmentDefinition. Returns null if the number of segments matching that id is zero.
+     */
+    // public Segment getSegment(SegmentDefinition segmentDefinition) {
+    //     List<Segment> segs = findSegment(segmentDefinition);
+    //     if (!segs.isEmpty())
+    //         return findSegment(segmentDefinition).get(0);
+    //     return null;
+    // }
+
+    /**
+     * Finds all elements with the SegmentDefinition and returns the specified index
+     * @param segmentDefinition to search for
+     * @param index to return for that id
+     * @return Returns segments that match the SegmentDefinition. Returns null if the number of segments matching that id is less than the index requested.
+     */
+    public Segment getSegment(SegmentDefinition segmentDefinition, int index) {
+        List<Segment> segs = findSegment(segmentDefinition);
+        if (index >= 0 && index < segs.size()) {
+            return segs.get(index);
+        }
         return null;
     }
 
@@ -702,7 +798,7 @@ public class Loop implements Iterable<Segment> {
                 SegmentDefinition segmentDefinition = (SegmentDefinition)positioned;
                 int idx = 0;
                 Segment segment;
-                while ((segment = getSegment(segmentDefinition.getXid(), idx)) != null) {
+                while ((segment = getSegment(segmentDefinition, idx)) != null) {
                     children.add(segment.toMap(segmentDefinition, newParentIds, idx));
                     ++idx;
                 }
